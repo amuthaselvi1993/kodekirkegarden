@@ -28,8 +28,3 @@ describe('hentLedigeRom', () => {
     expect(rom.map((r) => r.id)).toEqual(['brg-2-taarnet'])
   })
 })
-
-describe.skip('venteliste', () => {
-  it('setter bruker på venteliste når rommet er fullt', () => {})
-  it('gir beskjed når plassen blir ledig', () => {})
-})

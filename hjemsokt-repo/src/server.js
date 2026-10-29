@@ -15,10 +15,6 @@ app.use(autentiser)
 app.use('/api/bookinger', bookingRuter)
 app.use('/api/rom', romRuter)
 
-// app.use('/api/v1/bookinger', require('./routes/bookingerV1'))
-// app.use('/api/v1/rom', require('./routes/romV1'))
-// Gamle v1-ruter. Fjernet når mobilappen gikk over til v2 (mars 2021).
-
 async function start () {
   await lastPlugins(config.plugins)
   startJobber(config.jobber)
