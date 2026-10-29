@@ -30,12 +30,6 @@ function hentLedigeRom ({ fra, til, kontor }) {
     .filter((r) => !db.bookinger.some((b) => b.romId === r.id && overlapper(b, { fra, til })))
 }
 
-// Rabatt for eksterne kunder som leier prosjektrom. Avtalen ble aldri signert.
-function beregnRabatt (booking, kunde) {
-  if (kunde.type === 'ekstern' && booking.timer > 4) return 0.15
-  return 0
-}
-
 // FIXME (2021-03-12): eksporten til Outlook dobler heldagsmøter. Ola ser på det.
 function eksporterTilOutlook (booking) {
   return [
