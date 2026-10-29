@@ -95,19 +95,17 @@
     <div class="logo"><img src="logo.webp" alt="KillSwitch logo"></div>
     <div>
       <h1><span>Kill</span>Switch</h1>
-      <div class="sub tag">Dead code stays dead</div>
+      <div class="sub tag">Dead code ends here</div>
       <div class="sub">What was found, what was removed safely, and what needs a human decision</div>
     </div>
   </div>
   <div style="text-align:right">
     <div class="sub" id="scan"></div>
     <button class="btn primary" id="startBtn" style="margin-top:6px">▶ Start scan</button>
-    <label class="btn" style="display:inline-block;margin-top:6px">Load JSON report…<input id="file" type="file" accept=".json,application/json" hidden></label>
-    <span class="sub" id="loadMsg"></span>
     <div id="runStatus" class="sub" role="status" aria-live="polite"></div>
   </div>
 </header>
-<div class="banner" id="banner">Showing <strong>sample data</strong>. Click “Load JSON report…”, drop a <code>.json</code> file onto the page, or place <code>report.json</code> next to this file.</div>
+<div class="banner" id="banner">Showing <strong>sample data</strong>. Start a scan to refresh the findings.</div>
 
 <main>
   <section class="grid kpis" id="kpis"></section>
@@ -141,7 +139,9 @@
   <div id="tab-review" hidden>
     <div class="card">
       <h2>Awaiting human decision</h2><div class="hint">Approve to queue for deletion, reject to keep (the agent will suppress it in future scans). Decisions here are local to this page.</div>
-      <div class="tools"><input id="rq" placeholder="Search path or reason…"><select id="rrisk"><option value="">All risk levels</option><option>High</option><option>Medium</option><option>Low</option></select></div>
+      <div class="tools"><input id="rq" placeholder="Search path or reason…"><select id="rrisk"><option value="">All risk levels</option><option>High</option><option>Medium</option><option>Low</option></select><button class="btn primary" id="preparePr" type="button">🦇 Prepare PR from approvals</button></div>
+      <div id="prStatus" class="reason"></div>
+      <pre id="prDiff" class="diff" hidden></pre>
       <div id="reviewTable"></div>
     </div>
   </div>
@@ -183,9 +183,6 @@
     </select>
   </label>
   <label class="chk" id="dlgTestsWrap"><input type="checkbox" id="dlgTests" checked> Run unit tests after any deletion</label>
-  <label>Endpoint URL (POST)
-    <input type="text" id="dlgUrl" placeholder="https://… (leave empty for a simulated run)">
-  </label>
   <div class="row">
     <button class="btn" id="dlgCancel" type="button">Cancel</button>
     <button class="btn primary" id="dlgGo" type="button">Start</button>
@@ -403,6 +400,23 @@ function renderTables(){
   ], DATA.history.filter(r=>(!hb||r.by===hb)&&(!hq||(r.path+r.run).toLowerCase().includes(hq))), "hist");
   renderTests();
 }
+$("#preparePr").addEventListener("click",async()=>{
+  const approved=state.review.filter(r=>r.decision==="approved");
+  if(!approved.length){$("#prStatus").textContent="Approve at least one finding first.";return}
+  $("#preparePr").disabled=true;$("#prStatus").textContent="Preparing local branch and staged diff…";
+  try{
+    const response=await fetch("/api/pr/prepare-approved",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({findings:approved})});
+    const data=await response.json();if(!response.ok)throw new Error(data.error||"Preparation failed.");
+    $("#prDiff").hidden=false;$("#prDiff").textContent=`Branch: ${data.branch}\n${data.message}\n\n${data.summary}\n\n${data.diff}`;
+    $("#prStatus").textContent=`${data.files.length} approved file(s) staged on ${data.branch}.`;
+    if(window.confirm("Diff is ready. Commit, push, and open a GitHub PR now?")){
+      const opened=await fetch("/api/pr/open",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({branch:data.branch})});
+      const result=await opened.json();if(!opened.ok)throw new Error(result.error||"Could not open PR.");
+      $("#prStatus").innerHTML=`PR opened: <a href="${esc(result.url)}" target="_blank" rel="noopener">#${result.number}</a>`;
+    }
+  }catch(error){$("#prStatus").textContent=error.message}
+  finally{$("#preparePr").disabled=false}
+});
 document.addEventListener("click",e=>{
   const t=e.target;
   if(t.dataset.copy){navigator.clipboard.writeText(t.dataset.copy).then(()=>{const o=t.textContent;t.textContent="Copied ✓";setTimeout(()=>t.textContent=o,1200)});return}
@@ -420,18 +434,17 @@ document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
 });
 
 // ---------- Start the agent (manual trigger) ----------
-// Sends POST {action,scope,mode,runTests,requestedAt} to the configured endpoint.
+// Sends POST {action,scope,mode,runTests,requestedAt} to the local scan API.
 // Optional response: {runId, statusUrl}. statusUrl is polled for {state:"queued|running|done|failed", message}.
-// Endpoint can be preset in config.json: {"startUrl":"https://..."}. Do not put tokens in the page; let the endpoint handle auth.
-const cfg = {startUrl: localStorage.getItem("ks.startUrl")||""};
-fetch("config.json",{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject()).then(c=>{if(c.startUrl)cfg.startUrl=c.startUrl;cfg.dryRunOnly=!!c.dryRunOnly}).catch(()=>{});
+const cfg = {dryRunOnly:false};
+fetch("config.json",{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject()).then(c=>{cfg.dryRunOnly=!!c.dryRunOnly}).catch(()=>{});
 let running = false;
 function setStatus(kind,text){
   const cls={run:"b-review",ok:"b-safe",err:"b-crit"}[kind];
   $("#runStatus").innerHTML = text?`<span class="badge ${cls}">${{run:"◐",ok:"✓",err:"▲"}[kind]} ${esc(text)}</span>`:"";
 }
 function setRunning(v){running=v;$("#startBtn").disabled=v}
-$("#startBtn").addEventListener("click",()=>{$("#dlgUrl").value=cfg.startUrl;$("#dlgModeWrap").hidden=$("#dlgTestsWrap").hidden=!!cfg.dryRunOnly;$("#startDlg").showModal()});
+$("#startBtn").addEventListener("click",()=>{$("#dlgModeWrap").hidden=$("#dlgTestsWrap").hidden=!!cfg.dryRunOnly;$("#startDlg").showModal()});
 $("#dlgCancel").addEventListener("click",()=>$("#startDlg").close());
 $("#dlgScope").addEventListener("change",e=>{$("#dlgValueWrap").hidden=e.target.value==="all"});
 async function pollStatus(url,tries=0){
@@ -440,31 +453,36 @@ async function pollStatus(url,tries=0){
     const j=await (await fetch(url,{cache:"no-store",credentials:"include"})).json();
     if(j.state==="done"){
       setStatus("ok","Run finished"+(j.message?": "+j.message:""));setRunning(false);
-      fetch("report.json",{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject()).then(r=>loadReport(r,"report.json")).catch(()=>{});return}
+      fetch(j.reportUrl||"/api/report",{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject()).then(r=>loadReport(r,"live scan")).catch(e=>setStatus("err","Scan finished, but report could not be loaded: "+e.message));return}
     if(j.state==="failed"){setStatus("err","Run failed"+(j.message?": "+j.message:""));setRunning(false);return}
     setStatus("run",(j.state==="queued"?"Queued":"Running")+(j.message?": "+j.message:"…"));
   }catch(e){setStatus("run","Waiting for status…")}
   setTimeout(()=>pollStatus(url,tries+1),10000);
 }
 $("#dlgGo").addEventListener("click",async()=>{
-  const url=$("#dlgUrl").value.trim(), scope=$("#dlgScope").value, value=$("#dlgValue").value.trim();
+  const url="/api/start", scope=$("#dlgScope").value, value=$("#dlgValue").value.trim();
   if(scope!=="all"&&!value){$("#dlgValue").focus();return}
   const body={action:"start-scan",scope:{type:scope,value:scope==="all"?null:value},mode:cfg.dryRunOnly?"scan-only":$("#dlgMode").value,
     runTests:cfg.dryRunOnly?false:$("#dlgTests").checked,requestedAt:new Date().toISOString(),source:"KillSwitch dashboard"};
   $("#startDlg").close(); setRunning(true); setStatus("run","Starting…");
-  if(!url){ // simulated run, nothing is sent
-    setTimeout(()=>{setStatus("ok","Simulated run only. No endpoint set, nothing was sent.");setRunning(false)},1500);return}
   try{
     const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),credentials:"include"});
-    if(!r.ok){let m="HTTP "+r.status;try{m=(await r.json()).error||m}catch{}throw new Error(m)}
-    localStorage.setItem("ks.startUrl",url); cfg.startUrl=url;
+    if(!r.ok){
+      let details={};try{details=await r.json()}catch{}
+      if(r.status===409 && details.statusUrl){
+        setStatus("run","A scan is already running"+(details.runId?" ("+details.runId+")":"")+" — following it…");
+        pollStatus(details.statusUrl);
+        return;
+      }
+      throw new Error(details.error||"HTTP "+r.status);
+    }
     let j={};try{j=await r.json()}catch{}
     setStatus("run","Run started"+(j.runId?" ("+j.runId+")":""));
     if(j.statusUrl)pollStatus(j.statusUrl);else setRunning(false);
   }catch(e){setStatus("err","Could not start: "+e.message);setRunning(false)}
 });
 
-// ---------- JSON report loading ----------
+// ---------- Report normalization ----------
 // Expected shape: { scannedAt, repo, safe:[{path,symbol,type,module,loc,conf,why}],
 //   review:[{...same, risk:"High|Medium|Low"}], history:[{date,run,path,type,module,loc,by,commit}] }
 function normalize(j){
@@ -491,20 +509,12 @@ function renderAll(){
 function loadReport(j,label){
   DATA = normalize(j);
   $("#banner").hidden = true;
-  $("#loadMsg").textContent = "Loaded: "+label;
   renderAll();
 }
-$("#file").addEventListener("change",async e=>{
-  const f=e.target.files[0]; if(!f)return;
-  try{loadReport(JSON.parse(await f.text()),f.name)}catch(err){$("#loadMsg").textContent="Could not read JSON: "+err.message}
-});
-addEventListener("dragover",e=>e.preventDefault());
-addEventListener("drop",async e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(!f)return;
-  try{loadReport(JSON.parse(await f.text()),f.name)}catch(err){$("#loadMsg").textContent="Could not read JSON: "+err.message}});
 
 renderAll();
-// Auto-load report.json when served next to this page; otherwise sample data stays.
-fetch("report.json",{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject()).then(j=>loadReport(j,"report.json")).catch(()=>{});
+// Load the latest server-generated report when one exists; otherwise keep sample data.
+fetch("/api/report",{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject()).then(j=>loadReport(j,"latest scan")).catch(()=>{});
 </script>
 </body>
 </html>

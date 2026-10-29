@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="no">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kodekirkegården</title>
+    <style>
+      :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 50% -10%, #54206f 0, #1d1029 34%, #090611 76%); color: #fff7ed; }
+      body::before { content: "✦  ✧  🦇  ✧  ✦"; display: block; position: fixed; inset: 14px 0 auto; text-align: center; color: #fbbf24; letter-spacing: 18px; opacity: .7; pointer-events: none; }
+      .shell { width: min(940px, 100%); min-height: 100vh; margin: auto; display: flex; flex-direction: column; padding: 48px 18px 18px; }
+      header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+      .logo { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 18px; background: linear-gradient(145deg, #fb923c, #c2410c); box-shadow: 0 0 28px #f9731670; font-size: 28px; }
+      h1 { margin: 0; font-size: clamp(1.35rem, 3vw, 2rem); }
+      .subtitle { margin: 4px 0 0; color: #d8b4fe; }
+      #messages { flex: 1; display: flex; flex-direction: column; gap: 14px; padding: 12px 0 22px; }
+      .message { max-width: 88%; padding: 14px 16px; border-radius: 16px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+      .user { align-self: flex-end; background: linear-gradient(135deg, #7e22ce, #581c87); }
+      .assistant { align-self: flex-start; background: #1c1228; border: 1px solid #6b21a8; box-shadow: 0 8px 26px #0005; }
+      .assistant.revealing { animation: haunted-glow 1.8s ease-out; }
+      .assistant::before { content: "☽"; display: block; margin-bottom: 5px; color: #fbbf24; font-size: .78rem; opacity: .8; }
+      .empty { margin: auto; text-align: center; color: #d8b4fe; }
+      form { display: flex; gap: 10px; padding-top: 12px; border-top: 1px solid #6b21a8; }
+      textarea { flex: 1; resize: vertical; min-height: 54px; max-height: 180px; padding: 14px; border: 1px solid #7e22ce; border-radius: 12px; background: #10091a; color: #fff7ed; font: inherit; }
+      button { align-self: stretch; padding: 0 20px; border: 0; border-radius: 12px; background: linear-gradient(135deg, #f97316, #c2410c); color: white; font-weight: 700; cursor: pointer; box-shadow: 0 0 18px #f9731655; }
+      button:disabled { opacity: .55; cursor: wait; }
+      .status { min-height: 22px; padding-top: 8px; color: #d8b4fe; font-size: .9rem; }
+      .pr-card { margin-top: 12px; padding-top: 12px; border-top: 1px dashed #a855f7; }
+      .pr-card button { min-height: 40px; padding: 0 14px; }
+      .diff { margin-top: 12px; max-height: 280px; overflow: auto; padding: 12px; background: #08050d; border-radius: 10px; color: #fed7aa; font: .78rem/1.45 ui-monospace, monospace; white-space: pre; }
+      .haunt { position: fixed; z-index: 3; pointer-events: none; animation: haunt-away 1.8s ease-out forwards; font-size: 1.35rem; }
+      @keyframes haunted-glow { 0% { box-shadow: 0 0 0 #f9731600; } 35% { box-shadow: 0 0 34px #f9731688, 0 0 60px #7e22ce66; } 100% { box-shadow: 0 8px 26px #0005; } }
+      @keyframes haunt-away { 0% { transform: translateY(0) scale(.7) rotate(0); opacity: 0; } 18% { opacity: 1; } 100% { transform: translateY(-100px) translateX(var(--drift)) scale(1.25) rotate(24deg); opacity: 0; } }
+      @media (max-width: 600px) { form { flex-direction: column; } button { min-height: 48px; } .message { max-width: 96%; } }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <div class="logo">🪦</div>
+        <div><h1>Kodekirkegården</h1><p class="subtitle">Finn død kode uten å grave alene.</p></div>
+      </header>
+      <section id="messages" aria-live="polite">
+        <div class="empty">Spør agenten om å undersøke <code>hjemsokt-repo</code>.</div>
+      </section>
+      <form id="chat-form">
+        <textarea id="message" rows="2" placeholder="Skriv for eksempel: Finn en pakke som ikke brukes." required></textarea>
+        <button type="submit">Send</button>
+      </form>
+      <div class="status" id="status"></div>
+    </main>
+    <script>
+      const form = document.querySelector('#chat-form');
+      const input = document.querySelector('#message');
+      const messages = document.querySelector('#messages');
+      const status = document.querySelector('#status');
+      const button = form.querySelector('button');
+
+      function addMessage(text, role, finding = '') {
+        messages.querySelector('.empty')?.remove();
+        const element = document.createElement('div');
+        element.className = `message ${role}`;
+        element.textContent = text;
+        messages.append(element);
+        if (role === 'assistant' && /^CONFIDENT:\s*ja\b/im.test(finding)) {
+          addPrCard(element, finding);
+        }
+        element.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+
+      function summonHaunt() {
+        const symbols = ['🦇', '🕸️', '✨', '🔥'];
+        for (let i = 0; i < 7; i += 1) {
+          const haunt = document.createElement('span');
+          haunt.className = 'haunt';
+          haunt.textContent = symbols[i % symbols.length];
+          haunt.style.left = `${35 + Math.random() * 30}%`;
+          haunt.style.top = `${48 + Math.random() * 14}%`;
+          haunt.style.setProperty('--drift', `${-90 + Math.random() * 180}px`);
+          haunt.style.animationDelay = `${i * 55}ms`;
+          document.body.append(haunt);
+          haunt.addEventListener('animationend', () => haunt.remove(), { once: true });
+        }
+      }
+
+      function revealAssistant(text) {
+        messages.querySelector('.empty')?.remove();
+        const element = document.createElement('div');
+        element.className = 'message assistant revealing';
+        const content = document.createElement('span');
+        element.append(content);
+        messages.append(element);
+        let index = 0;
+        const step = () => {
+          index = Math.min(index + Math.max(2, Math.ceil(text.length / 180)), text.length);
+          content.textContent = text.slice(0, index);
+          element.scrollIntoView({ behavior: 'smooth', block: 'end' });
+          if (index < text.length) {
+            window.setTimeout(step, 12);
+          } else {
+            element.classList.remove('revealing');
+            summonHaunt();
+            if (/^CONFIDENT:\s*ja\b/im.test(text)) addPrCard(element, text);
+          }
+        };
+        step();
+      }
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const message = input.value.trim();
+        if (!message) return;
+        addMessage(message, 'user');
+        input.value = '';
+        button.disabled = true;
+        status.textContent = 'Agenten graver…';
+        try {
+          const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ message }),
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'Noe gikk galt.');
+          revealAssistant(data.response);
+          status.textContent = '';
+        } catch (error) {
+          addMessage(`Feil: ${error.message}`, 'assistant');
+          status.textContent = 'Forespørselen feilet.';
+        } finally {
+          button.disabled = false;
+          input.focus();
+        }
+      });
+
+      function addPrCard(element, finding) {
+        const card = document.createElement('div');
+        card.className = 'pr-card';
+        const action = document.createElement('button');
+        action.type = 'button';
+        action.textContent = '🧟 Forbered lokal PR og vis diff';
+        action.addEventListener('click', async () => {
+          action.disabled = true;
+          action.textContent = 'Graver frem gren…';
+          try {
+            const response = await fetch('/api/pr/prepare', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ finding, title: 'confident-dead-code' }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'PR-forberedelse feilet.');
+            const diff = document.createElement('pre');
+            diff.className = 'diff';
+            diff.textContent = `Gren: ${data.branch}\n${data.message}\n\n${data.summary}\n\n${data.diff}`;
+            card.replaceChildren(diff);
+          } catch (error) {
+            action.disabled = false;
+            action.textContent = `Feil: ${error.message}`;
+          }
+        });
+        card.append(action);
+        element.append(card);
+      }
+    </script>
+  </body>
+</html>
