@@ -1,0 +1,510 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/webp" href="logo.webp">
+<title>KillSwitch | Dead code overview</title>
+<style>
+  /* Capgemini Invent visual identity 2026: Dark theme, Ubuntu Light/Regular only */
+  :root{
+    color-scheme:dark;
+    --dark-blue:#121a38; --cap-blue:#0058ab; --light-blue:#1db8f2; --turquoise:#00d5d0; --yellow:#feb100; --orange:#ff816e;
+    --grey1:#f3f4f7; --grey4:#adb8c2; --grey-mid:#738597;
+    --bg:var(--dark-blue); --surface:color-mix(in srgb,var(--dark-blue) 90%,#fff); --ink:var(--grey1);
+    --ink2:color-mix(in srgb,var(--grey1) 85%,var(--dark-blue)); --muted:var(--grey4);
+    --line:color-mix(in srgb,var(--grey4) 22%,var(--dark-blue));
+    --safe:var(--turquoise);  --safe-bg:color-mix(in srgb,var(--turquoise) 26%,var(--dark-blue));
+    --review:var(--yellow);   --review-bg:color-mix(in srgb,var(--yellow) 26%,var(--dark-blue));
+    --hist:var(--light-blue); --hist-bg:color-mix(in srgb,var(--light-blue) 26%,var(--dark-blue));
+    --crit:var(--orange);     --crit-bg:color-mix(in srgb,var(--orange) 26%,var(--dark-blue));
+    --radius:4px;
+  }  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.5 Ubuntu,"Segoe UI",system-ui,sans-serif;font-weight:300;background:var(--bg);color:var(--ink)}
+  b,strong,th,h1,h2{font-weight:400}
+  header{background-image:radial-gradient(60% 140% at 100% 0%,color-mix(in srgb,var(--cap-blue) 55%,transparent),transparent 70%);padding:28px 32px 24px;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;background-color:var(--dark-blue);color:var(--grey1);border-bottom:4px solid;border-image:linear-gradient(90deg,var(--cap-blue),var(--light-blue),var(--turquoise)) 1}
+  .brand{display:flex;align-items:center;gap:18px}
+  /* Logo art has a black background: "screen" blend lets the header show through, crop keeps the figure and switch */
+  .logo{width:112px;height:112px;overflow:hidden;flex:none;position:relative}
+  .logo img{position:absolute;width:200px;left:-45px;top:-16px;mix-blend-mode:screen;filter:contrast(1.2) brightness(1.6)}
+  h1{margin:0;font-size:28px;font-weight:300;color:var(--grey1);letter-spacing:.3em;text-transform:uppercase}
+  h1 span{color:#e5202b}
+  .tag{letter-spacing:.35em;text-transform:uppercase;font-size:11px;margin:2px 0 8px}
+  .sub{color:var(--ink2);margin-top:2px}
+  header .sub{color:var(--grey4)}
+  header .btn{background:transparent;color:var(--grey1);border-color:var(--grey4)}
+  header .btn:hover{background:rgba(255,255,255,.1)}
+  header .btn.primary,.btn.primary{background:var(--cap-blue);border-color:var(--light-blue);color:#fff}
+  header .btn.primary:hover,.btn.primary:hover{background:color-mix(in srgb,var(--cap-blue) 80%,var(--light-blue))}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  dialog{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:var(--radius);padding:24px;width:min(480px,92vw)}
+  dialog::backdrop{background:rgba(8,12,28,.7)}
+  dialog h2{margin:0 0 4px;font-size:20px;color:var(--light-blue)}
+  dialog label{display:block;margin-top:14px;font-size:12px;color:var(--muted)}
+  dialog input[type=text],dialog select{width:100%;margin-top:4px}
+  dialog .row{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+  dialog .chk{display:flex;gap:8px;align-items:center;color:var(--ink);font-size:14px}
+  #runStatus{margin-top:6px;font-size:13px}
+  .banner{margin:8px 32px 0;padding:8px 12px;border-radius:4px;background:var(--review-bg);color:var(--ink);font-size:13px;border:1px solid var(--line)}
+  main{padding:16px 32px 48px;max-width:1280px;margin:0 auto}
+  nav{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:16px 0}
+  nav button{background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;font:inherit;color:var(--ink2);cursor:pointer}
+  nav button[aria-selected=true]{color:var(--ink);border-color:var(--light-blue);font-weight:400}
+  .grid{display:grid;gap:16px}
+  .kpis{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+  .card h2{margin:0 0 2px;font-size:16px;color:var(--light-blue)}
+  .card .hint{color:var(--muted);font-size:12px;margin-bottom:12px}
+  .kpi .label{display:flex;align-items:center;gap:6px;color:var(--ink2);font-size:13px}
+  .kpi .num{font-size:34px;font-weight:300;margin:4px 0 0;font-variant-numeric:tabular-nums}
+  .kpi .note{color:var(--muted);font-size:12px}
+  .two{grid-template-columns:repeat(auto-fit,minmax(380px,1fr))}
+  .badge{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:400;white-space:nowrap;color:var(--ink)}
+  .b-safe{background:var(--safe-bg)}
+  .b-review{background:var(--review-bg)}
+  .b-hist{background:var(--hist-bg)}
+  .b-crit{background:var(--crit-bg)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;color:var(--muted);font-weight:400;font-size:12px;padding:8px;border-bottom:1px solid var(--line);cursor:pointer;user-select:none;white-space:nowrap}
+  td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  code{font:12px ui-monospace,Consolas,monospace;background:var(--bg);padding:1px 5px;border-radius:4px}
+  .path{word-break:break-all}
+  .tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  input,select{font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:4px;background:var(--surface);color:var(--ink)}
+  .btn{font:inherit;padding:4px 10px;border-radius:4px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+  .btn:hover{background:var(--bg)}
+  .btn.ok{border-color:var(--light-blue);color:var(--light-blue)}
+  .btn.no{border-color:var(--grey-mid);color:var(--ink2)}
+  .conf{display:inline-block;width:60px;height:6px;background:var(--line);border-radius:3px;vertical-align:middle;margin-right:6px;overflow:hidden}
+  .conf i{display:block;height:100%;background:var(--review)}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink2);margin-bottom:8px}
+  .legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;background:var(--c);vertical-align:-1px}
+  svg text{fill:var(--ink2);font-size:11px;font-family:Ubuntu,"Segoe UI",sans-serif}
+  svg .grid line{stroke:var(--line)}
+  #tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);padding:6px 10px;border-radius:6px;font-size:12px;opacity:0;transition:opacity .08s;z-index:10;max-width:260px}
+  .empty{color:var(--muted);padding:16px;text-align:center}
+  details summary{cursor:pointer;color:var(--ink2);font-size:12px}
+  .reason{color:var(--ink2);font-size:12px;margin-top:2px}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo"><img src="logo.webp" alt="KillSwitch logo"></div>
+    <div>
+      <h1><span>Kill</span>Switch</h1>
+      <div class="sub tag">Dead code stays dead</div>
+      <div class="sub">What was found, what was removed safely, and what needs a human decision</div>
+    </div>
+  </div>
+  <div style="text-align:right">
+    <div class="sub" id="scan"></div>
+    <button class="btn primary" id="startBtn" style="margin-top:6px">▶ Start scan</button>
+    <label class="btn" style="display:inline-block;margin-top:6px">Load JSON report…<input id="file" type="file" accept=".json,application/json" hidden></label>
+    <span class="sub" id="loadMsg"></span>
+    <div id="runStatus" class="sub" role="status" aria-live="polite"></div>
+  </div>
+</header>
+<div class="banner" id="banner">Showing <strong>sample data</strong>. Click “Load JSON report…”, drop a <code>.json</code> file onto the page, or place <code>report.json</code> next to this file.</div>
+
+<main>
+  <section class="grid kpis" id="kpis"></section>
+
+  <nav role="tablist">
+    <button role="tab" aria-selected="true" data-tab="overview">Overview</button>
+    <button role="tab" aria-selected="false" data-tab="review">Needs review <span id="reviewCount" class="badge b-review"></span></button>
+    <button role="tab" aria-selected="false" data-tab="safe" id="navSafe">Deleted safely</button>
+    <button role="tab" aria-selected="false" data-tab="tests">Test results <span id="testCount" class="badge b-crit" hidden></span></button>
+    <button role="tab" aria-selected="false" data-tab="history">Deletion history</button>
+  </nav>
+
+  <div id="tab-overview">
+    <div class="grid two">
+      <div class="card"><h2>Dead code by module</h2><div class="hint">Lines of code, split by what the agent did or recommends</div>
+        <div class="legend"><span style="--c:var(--safe)" id="legendSafe">Deleted safely</span><span style="--c:var(--review)">Needs review</span></div>
+        <div id="chartModules"></div></div>
+      <div class="card"><h2>Deleted lines over time</h2><div class="hint">Lines removed per month, all runs</div>
+        <div id="chartTime"></div></div>
+    </div>
+    <div class="grid two" style="margin-top:16px">
+      <div class="card"><h2>Findings by type</h2><div class="hint">Count of items, current scan</div><div id="chartTypes"></div></div>
+      <div class="card"><h2>How the agent decides</h2>
+        <div class="hint">Classification rules</div>
+        <p><span class="badge b-safe">✓ Safe to delete</span> No references (static + dynamic search), not exported publicly, no reflection/DI/route registration, tests pass after removal, confidence ≥ 95%.</p>
+        <p><span class="badge b-review">◐ Human in the loop</span> Public API surface, referenced by config/strings/reflection, feature flags, low test coverage, owned by another team, or confidence &lt; 95%.</p>
+        <p><span class="badge b-hist">↺ Recoverable</span> Every deletion is a separate commit and can be reverted.</p></div>
+    </div>
+  </div>
+
+  <div id="tab-review" hidden>
+    <div class="card">
+      <h2>Awaiting human decision</h2><div class="hint">Approve to queue for deletion, reject to keep (the agent will suppress it in future scans). Decisions here are local to this page.</div>
+      <div class="tools"><input id="rq" placeholder="Search path or reason…"><select id="rrisk"><option value="">All risk levels</option><option>High</option><option>Medium</option><option>Low</option></select></div>
+      <div id="reviewTable"></div>
+    </div>
+  </div>
+
+  <div id="tab-safe" hidden>
+    <div class="card">
+      <h2 id="safeTitle">Deleted safely by the agent</h2><div class="hint" id="safeHint">Passed all safety checks in the latest run</div>
+      <div class="tools"><input id="sq" placeholder="Search path…"></div>
+      <div id="safeTable"></div>
+    </div>
+  </div>
+
+  <div id="tab-tests" hidden>
+    <div id="testSummary"></div>
+    <div class="card" style="margin-top:16px"><h2>Test run history</h2><div class="hint">One run per deletion, executed by the test agent after the deletion</div><div id="testTable"></div></div>
+  </div>
+
+  <div id="tab-history" hidden>
+    <div class="card">
+      <h2>Previously deleted</h2><div class="hint">All earlier agent runs</div>
+      <div class="tools"><input id="hq" placeholder="Search path or run…"><select id="hby"><option value="">Approved by: anyone</option><option>Agent (auto)</option><option>Human</option></select></div>
+      <div id="histTable"></div>
+    </div>
+  </div>
+</main>
+<dialog id="startDlg">
+  <h2>Start KillSwitch scan</h2>
+  <div class="hint" style="color:var(--muted)">This starts the agent. It runs until it finishes, then the report updates here.</div>
+  <label>Scope
+    <select id="dlgScope"><option value="all">Whole repository</option><option value="module">One module</option><option value="path">One path</option></select>
+  </label>
+  <label id="dlgValueWrap" hidden>Module or path
+    <input type="text" id="dlgValue" placeholder="e.g. billing or src/billing/">
+  </label>
+  <label id="dlgModeWrap">Mode
+    <select id="dlgMode">
+      <option value="scan-only">Scan only (no deletions)</option>
+      <option value="scan-and-delete">Scan and delete safe items</option>
+    </select>
+  </label>
+  <label class="chk" id="dlgTestsWrap"><input type="checkbox" id="dlgTests" checked> Run unit tests after any deletion</label>
+  <label>Endpoint URL (POST)
+    <input type="text" id="dlgUrl" placeholder="https://… (leave empty for a simulated run)">
+  </label>
+  <div class="row">
+    <button class="btn" id="dlgCancel" type="button">Cancel</button>
+    <button class="btn primary" id="dlgGo" type="button">Start</button>
+  </div>
+</dialog>
+<div id="tip"></div>
+
+<script>
+// ---------- DATA (sample – replace with real agent output) ----------
+let DATA = {
+  scannedAt: "2026-10-29 06:12",
+  repo: "sample-monorepo",
+  safe: [
+    {path:"src/billing/legacyInvoice.ts", symbol:"renderLegacyInvoice", type:"Function", module:"billing", loc:142, conf:99, why:"0 references; tests pass after removal"},
+    {path:"src/utils/dateHelpers.ts", symbol:"parseOldFormat", type:"Function", module:"utils", loc:38, conf:98, why:"0 references; internal only"},
+    {path:"src/ui/OldBanner.tsx", symbol:"OldBanner", type:"Component", module:"ui", loc:96, conf:99, why:"Never imported; no route or lazy import"},
+    {path:"src/ui/styles/legacy.css", symbol:"(file)", type:"File", module:"ui", loc:410, conf:97, why:"No class names matched in any template"},
+    {path:"src/auth/sessionV1.ts", symbol:"(file)", type:"File", module:"auth", loc:230, conf:98, why:"Superseded by sessionV2; 0 imports"},
+    {path:"src/utils/arrayPolyfills.ts", symbol:"(file)", type:"File", module:"utils", loc:75, conf:99, why:"Runtime targets include native support"},
+    {path:"src/orders/exportCsvV1.ts", symbol:"exportCsvV1", type:"Function", module:"orders", loc:64, conf:96, why:"0 references; tests pass"},
+    {path:"package.json", symbol:"moment", type:"Dependency", module:"build", loc:1, conf:97, why:"No imports; lockfile only"},
+    {path:"src/orders/tmp_debug.ts", symbol:"(file)", type:"File", module:"orders", loc:52, conf:99, why:"Debug scratch file; 0 imports"}
+  ],
+  review: [
+    {path:"src/api/v1/customers.ts", symbol:"getCustomerLegacy", type:"Function", module:"api", loc:188, conf:71, risk:"High", why:"Exported in public API; external consumers may call it"},
+    {path:"src/billing/taxRules.ts", symbol:"applyVatRule2019", type:"Function", module:"billing", loc:120, conf:64, risk:"High", why:"Name referenced in a DB config string; regulated logic – ask Finance/Compliance"},
+    {path:"src/features/betaSearch.ts", symbol:"(file)", type:"File", module:"features", loc:340, conf:82, risk:"Medium", why:"Behind feature flag 'beta_search' (currently off)"},
+    {path:"src/auth/oauthLegacyCallback.ts", symbol:"handleLegacyCallback", type:"Function", module:"auth", loc:77, conf:78, risk:"High", why:"Registered via route table; security-sensitive"},
+    {path:"src/orders/OrderMapper.ts", symbol:"toLegacyDto", type:"Method", module:"orders", loc:45, conf:88, risk:"Low", why:"Only referenced from tests that are skipped"},
+    {path:"src/ui/Charts/PieChart.tsx", symbol:"PieChart", type:"Component", module:"ui", loc:210, conf:85, risk:"Medium", why:"Dynamic import with computed path found nearby"},
+    {path:"src/jobs/nightlyReconcile.ts", symbol:"(file)", type:"File", module:"jobs", loc:260, conf:60, risk:"High", why:"Scheduled via cron outside repo; cannot verify"},
+    {path:"src/utils/serialize.ts", symbol:"deserializeV0", type:"Function", module:"utils", loc:54, conf:90, risk:"Medium", why:"May read old persisted data; no test coverage"}
+  ],
+  tests: [
+    {run:"run-0420", date:"2026-10-29 06:31", commit:"9c2e1ab", framework:"Jest", status:"failed", total:1302, passed:1301, failed:1, skipped:0, duration:231,
+      failures:[{name:"orders › exportCsv › legacy format", file:"src/orders/export.test.ts", message:"TypeError: exportCsvV1 is not a function"}]},
+    {run:"run-0412", date:"2026-10-15 06:44", commit:"a1f93c2", framework:"Jest", status:"passed", total:1344, passed:1341, failed:0, skipped:3, duration:218, failures:[]},
+    {run:"run-0398", date:"2026-09-30 06:40", commit:"c0d4411", framework:"Jest", status:"passed", total:1398, passed:1398, failed:0, skipped:0, duration:224, failures:[]},
+    {run:"run-0377", date:"2026-09-12 06:38", commit:"e44f0a9", framework:"Jest", status:"passed", total:1411, passed:1409, failed:0, skipped:2, duration:240, failures:[]},
+    {run:"run-0351", date:"2026-08-28 06:35", commit:"f8123bc", framework:"Jest", status:"failed", total:1420, passed:1418, failed:2, skipped:0, duration:236,
+      failures:[{name:"cookies › reads consent", file:"src/utils/cookie.test.ts", message:"Cannot find module './cookieHelper'"},
+                {name:"cookies › writes consent", file:"src/utils/cookie.test.ts", message:"Cannot find module './cookieHelper'"}]}
+  ],
+  history: [
+    {date:"2026-10-15", run:"run-0412", path:"src/legacy/reportsV1/*", type:"Directory", module:"reports", loc:1840, by:"Human", commit:"a1f93c2"},
+    {date:"2026-10-15", run:"run-0412", path:"src/utils/lodashShim.ts", type:"File", module:"utils", loc:120, by:"Agent (auto)", commit:"b72e8d0"},
+    {date:"2026-09-30", run:"run-0398", path:"src/ui/OldModal.tsx", type:"Component", module:"ui", loc:310, by:"Agent (auto)", commit:"c0d4411"},
+    {date:"2026-09-30", run:"run-0398", path:"src/api/v0/*", type:"Directory", module:"api", loc:2210, by:"Human", commit:"d19ab75"},
+    {date:"2026-09-12", run:"run-0377", path:"src/orders/oldCheckout.ts", type:"File", module:"orders", loc:540, by:"Human", commit:"e44f0a9"},
+    {date:"2026-08-28", run:"run-0351", path:"package.json (jquery, underscore)", type:"Dependency", module:"build", loc:2, by:"Agent (auto)", commit:"f8123bc"},
+    {date:"2026-08-28", run:"run-0351", path:"src/utils/cookieHelper.ts", type:"File", module:"utils", loc:88, by:"Agent (auto)", commit:"0a5c7de"},
+    {date:"2026-07-20", run:"run-0310", path:"src/auth/basicAuth.ts", type:"File", module:"auth", loc:410, by:"Human", commit:"1b9e6f3"},
+    {date:"2026-07-20", run:"run-0310", path:"src/ui/styles/old-theme.css", type:"File", module:"ui", loc:1250, by:"Agent (auto)", commit:"2c7d0aa"},
+    {date:"2026-06-11", run:"run-0268", path:"src/billing/paypalV1.ts", type:"File", module:"billing", loc:690, by:"Human", commit:"3d1f2bb"},
+    {date:"2026-05-04", run:"run-0221", path:"src/jobs/legacyEmail.ts", type:"File", module:"jobs", loc:330, by:"Agent (auto)", commit:"4e8a9cd"},
+    {date:"2026-04-17", run:"run-0190", path:"src/features/oldDashboard/*", type:"Directory", module:"features", loc:1520, by:"Human", commit:"5f0b3ee"}
+  ]
+};
+
+// ---------- helpers ----------
+const $ = s => document.querySelector(s);
+const sum = (a,k) => a.reduce((t,x)=>t+x[k],0);
+const fmt = n => n.toLocaleString("en");
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const tip = $("#tip");
+function showTip(e,html){tip.innerHTML=html;tip.style.opacity=1;tip.style.left=Math.min(e.clientX+12,innerWidth-270)+"px";tip.style.top=(e.clientY+12)+"px"}
+function hideTip(){tip.style.opacity=0}
+function bindTips(root){root.querySelectorAll("[data-tip]").forEach(el=>{
+  el.addEventListener("mousemove",e=>showTip(e,el.dataset.tip));el.addEventListener("mouseleave",hideTip);
+  el.addEventListener("focus",()=>{const r=el.getBoundingClientRect();showTip({clientX:r.left,clientY:r.top},el.dataset.tip)});el.addEventListener("blur",hideTip)})}
+
+let state = {
+  review: DATA.review.map((r,i)=>({...r,id:i,decision:null})),
+  sort:{}
+};
+
+// ---------- KPIs ----------
+function latestTest(){return [...DATA.tests].sort((a,b)=>b.date.localeCompare(a.date))[0]}
+function testKpi(){
+  const t=latestTest();
+  if(!t)return ["▣","Tests after deletion","No run","No test run reported yet","var(--ink2)"];
+  return ["▣","Tests after deletion",`${fmt(t.passed)} / ${fmt(t.total)}`,t.status==="passed"?"All passed in "+t.run:`${t.failed} failed in ${t.run}`,t.status==="passed"?"var(--safe)":"var(--crit)"];
+}
+// Wording depends on whether the agent actually deletes (dryRun = it only finds and rates).
+const lbl=()=>DATA.dryRun
+  ?{kpi:"Safe to remove",kpiNote:" items found, nothing deleted",tab:"Safe to remove",card:"Rated safe to remove",hint:"Rated safe by the agent. Nothing has been deleted yet.",status:"✓ Safe to remove",bar:"Safe to remove"}
+  :{kpi:"Deleted safely (this run)",kpiNote:" items, auto-approved",tab:"Deleted safely",card:"Deleted safely by the agent",hint:"Passed all safety checks in the latest run",status:"✓ Deleted",bar:"Deleted safely"};
+function applyLabels(){
+  $("#navSafe").textContent=lbl().tab; $("#safeTitle").textContent=lbl().card; $("#safeHint").textContent=lbl().hint; $("#legendSafe").textContent=lbl().bar;
+}
+function renderKpis(){
+  const pending = state.review.filter(r=>!r.decision);
+  const k = [
+    ["✓",lbl().kpi,fmt(sum(DATA.safe,"loc"))+" LOC",DATA.safe.length+lbl().kpiNote,"var(--safe)"],
+    ["◐","Awaiting human review",fmt(sum(pending,"loc"))+" LOC",pending.length+" items pending","var(--review)"],
+    ["↺","Previously deleted",fmt(sum(DATA.history,"loc"))+" LOC",DATA.history.length+" items across "+new Set(DATA.history.map(h=>h.run)).size+" runs","var(--hist)"],
+    ["Σ","Total dead code found",fmt(sum(DATA.safe,"loc")+sum(DATA.review,"loc"))+" LOC",Math.round(100*sum(DATA.safe,"loc")/(sum(DATA.safe,"loc")+sum(DATA.review,"loc")))+"% handled automatically","var(--ink2)"]
+  ];
+  $("#kpis").innerHTML = [...k,testKpi()].map(([i,l,n,note,c])=>`<div class="card kpi"><div class="label"><span style="color:${c}">${i}</span>${l}</div><div class="num">${n}</div><div class="note">${note}</div></div>`).join("");
+  $("#reviewCount").textContent = pending.length;
+  $("#scan").textContent = `Last scan: ${DATA.scannedAt} · ${DATA.repo}`;
+}
+
+// ---------- charts ----------
+function chartModules(){
+  const mods = {};
+  DATA.safe.forEach(x=>(mods[x.module]??={safe:0,review:0}).safe+=x.loc);
+  DATA.review.forEach(x=>(mods[x.module]??={safe:0,review:0}).review+=x.loc);
+  const rows = Object.entries(mods).sort((a,b)=>(b[1].safe+b[1].review)-(a[1].safe+a[1].review));
+  if(!rows.length){$("#chartModules").innerHTML='<div class="empty">No findings.</div>';return}
+  const max = Math.max(...rows.map(r=>r[1].safe+r[1].review));
+  const W=560,L=80,R=50,rh=30,H=rows.length*rh+8, sc=v=>v/max*(W-L-R);
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Dead code lines by module">`;
+  rows.forEach(([m,v],i)=>{
+    const y=i*rh+4, w1=sc(v.safe), w2=sc(v.review);
+    s+=`<text x="${L-8}" y="${y+14}" text-anchor="end">${esc(m)}</text>`;
+    if(v.safe)s+=`<rect tabindex="0" data-tip="<b>${esc(m)}</b><br>${lbl().bar}: ${fmt(v.safe)} LOC" x="${L}" y="${y}" width="${w1}" height="20" rx="3" fill="var(--safe)"/>`;
+    if(v.review)s+=`<rect tabindex="0" data-tip="<b>${esc(m)}</b><br>Needs review: ${fmt(v.review)} LOC" x="${L+w1+(v.safe?2:0)}" y="${y}" width="${w2}" height="20" rx="3" fill="var(--review)"/>`;
+    s+=`<text x="${L+w1+w2+8}" y="${y+14}">${fmt(v.safe+v.review)}</text>`;
+  });
+  $("#chartModules").innerHTML=s+"</svg>"; bindTips($("#chartModules"));
+}
+function chartTime(){
+  const m={}; DATA.history.filter(h=>/^\d{4}-\d{2}/.test(h.date)).forEach(h=>{const k=h.date.slice(0,7);m[k]=(m[k]||0)+h.loc});
+  if(!Object.keys(m).length){$("#chartTime").innerHTML='<div class="empty">No deletion history.</div>';return}
+  // fill month gaps
+  const keys=Object.keys(m).sort(); const out=[]; let [y,mo]=keys[0].split("-").map(Number); const [ye,me]=keys.at(-1).split("-").map(Number);
+  while(y<ye||(y==ye&&mo<=me)){const k=`${y}-${String(mo).padStart(2,"0")}`;out.push([k,m[k]||0]);if(++mo>12){mo=1;y++}}
+  const W=560,H=220,L=44,B=26,T=10,max=Math.max(...out.map(o=>o[1])),bw=(W-L-10)/out.length;
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Deleted lines per month"><g class="grid">`;
+  for(let i=0;i<=4;i++){const v=max*i/4,y=H-B-(H-B-T)*i/4;s+=`<line x1="${L}" x2="${W-4}" y1="${y}" y2="${y}"/><text x="${L-6}" y="${y+4}" text-anchor="end">${fmt(Math.round(v))}</text>`}
+  s+="</g>";
+  out.forEach(([k,v],i)=>{const h=(H-B-T)*v/max,x=L+i*bw+bw*.2,w=bw*.6;
+    s+=`<rect tabindex="0" data-tip="<b>${k}</b><br>${fmt(v)} LOC deleted" x="${x}" y="${H-B-h}" width="${w}" height="${Math.max(h,0)}" rx="3" fill="var(--hist)"/>`;
+    s+=`<text x="${x+w/2}" y="${H-8}" text-anchor="middle">${k.slice(5)}/${k.slice(2,4)}</text>`});
+  $("#chartTime").innerHTML=s+"</svg>"; bindTips($("#chartTime"));
+}
+function chartTypes(){
+  const t={}; [...DATA.safe,...DATA.review].forEach(x=>t[x.type]=(t[x.type]||0)+1);
+  const rows=Object.entries(t).sort((a,b)=>b[1]-a[1]);
+  if(!rows.length){$("#chartTypes").innerHTML='<div class="empty">No findings.</div>';return}
+  const max=rows[0][1], W=560,L=100,rh=28;
+  let s=`<svg viewBox="0 0 ${W} ${rows.length*rh+6}" width="100%" role="img" aria-label="Findings by type">`;
+  rows.forEach(([k,v],i)=>{const y=i*rh+4,w=(W-L-40)*v/max;
+    s+=`<text x="${L-8}" y="${y+14}" text-anchor="end">${k}</text><rect tabindex="0" data-tip="${k}: ${v} item(s)" x="${L}" y="${y}" width="${w}" height="20" rx="3" fill="var(--grey4)"/><text x="${L+w+8}" y="${y+14}">${v}</text>`});
+  $("#chartTypes").innerHTML=s+"</svg>"; bindTips($("#chartTypes"));
+}
+
+// ---------- tables ----------
+function table(el, cols, rows, key){
+  const st=state.sort[key];
+  if(st) rows=[...rows].sort((a,b)=>{const x=a[st.k],y=b[st.k];return (x>y?1:x<y?-1:0)*st.d});
+  if(!rows.length){el.innerHTML='<div class="empty">No matching items.</div>';return}
+  el.innerHTML=`<table><thead><tr>${cols.map(c=>`<th data-k="${c.k||""}">${c.h}${st&&st.k===c.k?(st.d>0?" ▲":" ▼"):""}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${c.r(r)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+  el.querySelectorAll("th[data-k]").forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(!k)return;const o=state.sort[key];state.sort[key]={k,d:o&&o.k===k?-o.d:1};renderTables()});
+}
+const pathCell=r=>`<span class="path"><code>${esc(r.path)}</code></span>${r.symbol&&r.symbol!=="(file)"?`<div class="reason">${esc(r.symbol)}</div>`:""}${r.lastTouched?`<div class="reason">Last touched: ${esc(r.lastTouched)}</div>`:""}${r.obituary?`<details><summary>Obituary</summary><div class="reason">${esc(r.obituary)}</div></details>`:""}`;
+const confCell=r=>`<span class="conf"><i style="width:${r.conf}%"></i></span>${r.conf}%`;
+const riskBadge=r=>({High:'<span class="badge b-crit">▲ High</span>',Medium:'<span class="badge b-review">◆ Medium</span>',Low:'<span class="badge b-safe">● Low</span>'})[r.risk];
+
+function testBadge(t){return t.status==="passed"?'<span class="badge b-safe">✓ Passed</span>':`<span class="badge b-crit">▲ ${t.status==="error"?"Error":"Failed"}</span>`}
+const mmss=s=>Math.floor(s/60)+":"+String(Math.round(s%60)).padStart(2,"0");
+function renderTests(){
+  const T=[...DATA.tests].sort((a,b)=>b.date.localeCompare(a.date)), el=$("#testSummary"), cnt=$("#testCount");
+  if(!T.length){el.innerHTML='<div class="card empty">No test runs reported yet. Add a <code>tests</code> array to the report.</div>';$("#testTable").innerHTML="";cnt.hidden=true;return}
+  const t=T[0], seg=(v,c,l)=>v?`<div tabindex="0" data-tip="${l}: ${fmt(v)}" style="flex:${v};background:var(${c})"></div>`:"";
+  const full=t.fullCommit||t.commit;
+  cnt.hidden=t.status==="passed"; cnt.textContent=t.failed||"!";
+  el.innerHTML=`<div class="card">
+    <h2>Latest test run ${testBadge(t)}</h2>
+    <div class="hint">${esc(t.run)} · ${esc(t.date)} · ${esc(t.framework)} · ${mmss(t.duration)} min · after deletion ${DATA.repoUrl&&t.commit?`<a href="${esc(DATA.repoUrl)}/commit/${esc(full)}" target="_blank" rel="noopener"><code>${esc(t.commit)}</code></a>`:`<code>${esc(t.commit)}</code>`}</div>
+    <div style="display:flex;gap:2px;height:14px;border-radius:4px;overflow:hidden;margin:8px 0">${seg(t.passed,"--safe","Passed")}${seg(t.failed,"--crit","Failed")}${seg(t.skipped,"--grey4","Skipped")}</div>
+    <div class="legend"><span style="--c:var(--safe)">Passed ${fmt(t.passed)}</span><span style="--c:var(--crit)">Failed ${fmt(t.failed)}</span><span style="--c:var(--grey4)">Skipped ${fmt(t.skipped)}</span><span style="--c:transparent">Total ${fmt(t.total)}</span></div>
+    ${t.status==="passed"?'<div class="reason">All tests passed after the deletion. No action needed.</div>'
+      :`<div class="banner" style="margin:12px 0;background:var(--crit-bg)">Tests failed after this deletion. Recommended: revert the commit and review the failing tests. <button class="btn" data-copy="git revert ${esc(full)}">↺ Copy revert</button></div><div id="testFailures"></div>`}
+  </div>`;
+  bindTips(el);
+  if(t.status!=="passed") table($("#testFailures"),[
+    {h:"Failing test",k:"name",r:r=>esc(r.name)},{h:"File",k:"file",r:r=>`<code>${esc(r.file)}</code>`},{h:"Message",r:r=>esc(r.message)}
+  ], t.failures, "fail");
+  table($("#testTable"),[
+    {h:"Date",k:"date",r:r=>esc(r.date)},{h:"Run",k:"run",r:r=>esc(r.run)},{h:"Result",k:"status",r:testBadge},
+    {h:"Passed",k:"passed",r:r=>`${fmt(r.passed)} / ${fmt(r.total)}`},{h:"Failed",k:"failed",r:r=>r.failed},{h:"Skipped",k:"skipped",r:r=>r.skipped},
+    {h:"Duration",k:"duration",r:r=>mmss(r.duration)},{h:"Commit",r:r=>r.commit?`<code>${esc(r.commit)}</code>`:""}
+  ], T, "tests");
+}
+function renderTables(){
+  // review
+  const q=$("#rq").value.toLowerCase(), rk=$("#rrisk").value;
+  table($("#reviewTable"),[
+    {h:"Item",k:"path",r:pathCell},{h:"Type",k:"type",r:r=>r.type},{h:"LOC",k:"loc",r:r=>r.loc},
+    {h:"Risk",k:"risk",r:riskBadge},{h:"Confidence",k:"conf",r:confCell},
+    {h:"Why a human is needed",r:r=>esc(r.why)},
+    {h:"Decision",r:r=>r.decision?`<span class="badge ${r.decision==="approved"?"b-safe":"b-crit"}">${r.decision==="approved"?"✓ Approved":"✕ Kept"}</span> <button class="btn" data-undo="${r.id}">Undo</button>`
+      :`<button class="btn ok" data-ok="${r.id}">Approve</button> <button class="btn no" data-no="${r.id}">Keep</button>`}
+  ], state.review.filter(r=>(!rk||r.risk===rk)&&(!q||(r.path+r.why+r.symbol).toLowerCase().includes(q))), "review");
+  // safe
+  const sq=$("#sq").value.toLowerCase();
+  table($("#safeTable"),[
+    {h:"Item",k:"path",r:pathCell},{h:"Type",k:"type",r:r=>r.type},{h:"LOC",k:"loc",r:r=>r.loc},
+    {h:"Confidence",k:"conf",r:confCell},{h:"Evidence",r:r=>esc(r.why)},{h:"Status",r:()=>`<span class="badge b-safe">${lbl().status}</span>`}
+  ], DATA.safe.filter(r=>!sq||(r.path+r.symbol).toLowerCase().includes(sq)), "safe");
+  // history
+  const hq=$("#hq").value.toLowerCase(), hb=$("#hby").value;
+  table($("#histTable"),[
+    {h:"Date",k:"date",r:r=>r.date},{h:"Run",k:"run",r:r=>r.run},{h:"Item",k:"path",r:r=>`<span class="path"><code>${esc(r.path)}</code></span>`},
+    {h:"Type",k:"type",r:r=>r.type},{h:"LOC",k:"loc",r:r=>fmt(r.loc)},
+    {h:"Approved by",k:"by",r:r=>`<span class="badge ${r.by==="Human"?"b-review":"b-safe"}">${r.by==="Human"?"◐":"✓"} ${r.by}</span>`},
+    {h:"Tests",r:r=>{const x=DATA.tests.find(q=>(q.run&&q.run===r.run)||(q.commit&&q.commit===r.commit));return x?testBadge(x):"–"}},
+    {h:"Commit",r:r=>{
+      if(!r.commit)return "";
+      const full=r.fullCommit||r.commit;
+      const link=DATA.repoUrl?`<a href="${esc(DATA.repoUrl)}/commit/${esc(full)}" target="_blank" rel="noopener"><code>${esc(r.commit)}</code></a>`:`<code>${esc(r.commit)}</code>`;
+      return `${link}<div><button class="btn" data-copy="git revert ${esc(full)}" title="Copy revert command">↺ Copy revert</button></div>`}}
+  ], DATA.history.filter(r=>(!hb||r.by===hb)&&(!hq||(r.path+r.run).toLowerCase().includes(hq))), "hist");
+  renderTests();
+}
+document.addEventListener("click",e=>{
+  const t=e.target;
+  if(t.dataset.copy){navigator.clipboard.writeText(t.dataset.copy).then(()=>{const o=t.textContent;t.textContent="Copied ✓";setTimeout(()=>t.textContent=o,1200)});return}
+  const id=t.dataset.ok??t.dataset.no??t.dataset.undo; if(id===undefined)return;
+  const r=state.review.find(x=>x.id==id);
+  r.decision = t.dataset.ok!==undefined?"approved":t.dataset.no!==undefined?"kept":null;
+  renderKpis();renderTables();
+});
+["rq","rrisk","sq","hq","hby"].forEach(i=>$("#"+i).addEventListener("input",renderTables));
+
+// ---------- tabs ----------
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("nav button").forEach(x=>x.setAttribute("aria-selected",x===b));
+  ["overview","review","safe","tests","history"].forEach(t=>$("#tab-"+t).hidden=t!==b.dataset.tab);
+});
+
+// ---------- Start the agent (manual trigger) ----------
+// Sends POST {action,scope,mode,runTests,requestedAt} to the configured endpoint.
+// Optional response: {runId, statusUrl}. statusUrl is polled for {state:"queued|running|done|failed", message}.
+// Endpoint can be preset in config.json: {"startUrl":"https://..."}. Do not put tokens in the page; let the endpoint handle auth.
+const cfg = {startUrl: localStorage.getItem("ks.startUrl")||""};
+fetch("config.json",{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject()).then(c=>{if(c.startUrl)cfg.startUrl=c.startUrl;cfg.dryRunOnly=!!c.dryRunOnly}).catch(()=>{});
+let running = false;
+function setStatus(kind,text){
+  const cls={run:"b-review",ok:"b-safe",err:"b-crit"}[kind];
+  $("#runStatus").innerHTML = text?`<span class="badge ${cls}">${{run:"◐",ok:"✓",err:"▲"}[kind]} ${esc(text)}</span>`:"";
+}
+function setRunning(v){running=v;$("#startBtn").disabled=v}
+$("#startBtn").addEventListener("click",()=>{$("#dlgUrl").value=cfg.startUrl;$("#dlgModeWrap").hidden=$("#dlgTestsWrap").hidden=!!cfg.dryRunOnly;$("#startDlg").showModal()});
+$("#dlgCancel").addEventListener("click",()=>$("#startDlg").close());
+$("#dlgScope").addEventListener("change",e=>{$("#dlgValueWrap").hidden=e.target.value==="all"});
+async function pollStatus(url,tries=0){
+  if(tries>720){setStatus("err","Stopped waiting for the run. Check the agent.");setRunning(false);return}
+  try{
+    const j=await (await fetch(url,{cache:"no-store",credentials:"include"})).json();
+    if(j.state==="done"){
+      setStatus("ok","Run finished"+(j.message?": "+j.message:""));setRunning(false);
+      fetch("report.json",{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject()).then(r=>loadReport(r,"report.json")).catch(()=>{});return}
+    if(j.state==="failed"){setStatus("err","Run failed"+(j.message?": "+j.message:""));setRunning(false);return}
+    setStatus("run",(j.state==="queued"?"Queued":"Running")+(j.message?": "+j.message:"…"));
+  }catch(e){setStatus("run","Waiting for status…")}
+  setTimeout(()=>pollStatus(url,tries+1),10000);
+}
+$("#dlgGo").addEventListener("click",async()=>{
+  const url=$("#dlgUrl").value.trim(), scope=$("#dlgScope").value, value=$("#dlgValue").value.trim();
+  if(scope!=="all"&&!value){$("#dlgValue").focus();return}
+  const body={action:"start-scan",scope:{type:scope,value:scope==="all"?null:value},mode:cfg.dryRunOnly?"scan-only":$("#dlgMode").value,
+    runTests:cfg.dryRunOnly?false:$("#dlgTests").checked,requestedAt:new Date().toISOString(),source:"KillSwitch dashboard"};
+  $("#startDlg").close(); setRunning(true); setStatus("run","Starting…");
+  if(!url){ // simulated run, nothing is sent
+    setTimeout(()=>{setStatus("ok","Simulated run only. No endpoint set, nothing was sent.");setRunning(false)},1500);return}
+  try{
+    const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),credentials:"include"});
+    if(!r.ok){let m="HTTP "+r.status;try{m=(await r.json()).error||m}catch{}throw new Error(m)}
+    localStorage.setItem("ks.startUrl",url); cfg.startUrl=url;
+    let j={};try{j=await r.json()}catch{}
+    setStatus("run","Run started"+(j.runId?" ("+j.runId+")":""));
+    if(j.statusUrl)pollStatus(j.statusUrl);else setRunning(false);
+  }catch(e){setStatus("err","Could not start: "+e.message);setRunning(false)}
+});
+
+// ---------- JSON report loading ----------
+// Expected shape: { scannedAt, repo, safe:[{path,symbol,type,module,loc,conf,why}],
+//   review:[{...same, risk:"High|Medium|Low"}], history:[{date,run,path,type,module,loc,by,commit}] }
+function normalize(j){
+  const arr = v => Array.isArray(v) ? v : [];
+  const s = (x,d="") => x==null ? d : x;
+  const n = x => Number(x)||0;
+  const item = x => ({path:s(x.path,"?"),symbol:s(x.symbol),type:s(x.type,"Other"),module:s(x.module,"other"),loc:n(x.loc),conf:n(x.conf),why:s(x.why),obituary:s(x.obituary),lastTouched:s(x.lastTouched)});
+  return {
+    scannedAt:s(j.scannedAt,"unknown"), repo:s(j.repo,""), repoUrl:s(j.repoUrl,"").replace(/\/+$/,""), dryRun:!!j.dryRun,
+    safe:arr(j.safe).map(item),
+    review:arr(j.review).map(x=>({...item(x),risk:["High","Medium","Low"].includes(x.risk)?x.risk:"Medium"})),
+    tests:arr(j.tests).map(x=>({run:s(x.run),date:s(x.date),commit:s(x.commit),framework:s(x.framework,"Tests"),
+      status:["passed","failed","error"].includes(x.status)?x.status:(n(x.failed)?"failed":"passed"),
+      total:n(x.total),passed:n(x.passed),failed:n(x.failed),skipped:n(x.skipped),duration:n(x.duration),
+      failures:arr(x.failures).map(f=>({name:s(f.name),file:s(f.file),message:s(f.message)}))})),
+    history:arr(j.history).map(x=>({date:s(x.date,"").slice(0,10),run:s(x.run),path:s(x.path,"?"),type:s(x.type,"Other"),module:s(x.module,"other"),loc:n(x.loc),by:x.by==="Human"?"Human":"Agent (auto)",commit:s(x.commit),fullCommit:s(x.fullCommit)}))
+  };
+}
+function renderAll(){
+  state.review = DATA.review.map((r,i)=>({...r,id:i,decision:null}));
+  renderKpis();
+  chartModules();chartTime();chartTypes();renderTables();applyLabels();
+}
+function loadReport(j,label){
+  DATA = normalize(j);
+  $("#banner").hidden = true;
+  $("#loadMsg").textContent = "Loaded: "+label;
+  renderAll();
+}
+$("#file").addEventListener("change",async e=>{
+  const f=e.target.files[0]; if(!f)return;
+  try{loadReport(JSON.parse(await f.text()),f.name)}catch(err){$("#loadMsg").textContent="Could not read JSON: "+err.message}
+});
+addEventListener("dragover",e=>e.preventDefault());
+addEventListener("drop",async e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(!f)return;
+  try{loadReport(JSON.parse(await f.text()),f.name)}catch(err){$("#loadMsg").textContent="Could not read JSON: "+err.message}});
+
+renderAll();
+// Auto-load report.json when served next to this page; otherwise sample data stays.
+fetch("report.json",{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject()).then(j=>loadReport(j,"report.json")).catch(()=>{});
+</script>
+</body>
+</html>
