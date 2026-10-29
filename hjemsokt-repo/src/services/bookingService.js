@@ -1,7 +1,6 @@
 const { v4: uuid } = require('uuid')
 const db = require('../db')
 const { overlapper, formaterDato } = require('../utils/dato')
-// const _ = require('lodash')
 
 function opprettBooking ({ romId, fra, til, brukerId, tittel }) {
   const rom = db.rom.find((r) => r.id === romId)
@@ -30,12 +29,6 @@ function hentLedigeRom ({ fra, til, kontor }) {
     .filter((r) => !db.bookinger.some((b) => b.romId === r.id && overlapper(b, { fra, til })))
 }
 
-// Rabatt for eksterne kunder som leier prosjektrom. Avtalen ble aldri signert.
-function beregnRabatt (booking, kunde) {
-  if (kunde.type === 'ekstern' && booking.timer > 4) return 0.15
-  return 0
-}
-
 // FIXME (2021-03-12): eksporten til Outlook dobler heldagsmøter. Ola ser på det.
 function eksporterTilOutlook (booking) {
   return [
@@ -57,20 +50,6 @@ function formaterBookingForLonn (booking) {
     timer: (new Date(booking.til) - new Date(booking.fra)) / 36e5
   }
 }
-
-/*
-function grupperPerKontor (bookinger) {
-  return _.groupBy(bookinger, (b) => {
-    const rom = db.rom.find((r) => r.id === b.romId)
-    return rom ? rom.kontor : 'ukjent'
-  })
-}
-
-function statistikkPerKontor () {
-  const grupper = grupperPerKontor(db.bookinger)
-  return _.mapValues(grupper, (liste) => liste.length)
-}
-*/
 
 module.exports = {
   opprettBooking,
